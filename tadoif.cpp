@@ -202,21 +202,19 @@ void TadoIf::_fetch(const std::vector<std::string> &argv)
 	{
 		bool proxy;
 		bool debug;
-		unsigned int zones;
 
 		positional_options.add("host", -1);
 		main_options.add_options()
 			("proxy,p",		boost::program_options::bool_switch(&proxy)->implicit_value(true),	"run proxy")
-			("debug,d",		boost::program_options::bool_switch(&debug)->implicit_value(true),	"show fetched information from proxy")
-			("zones,z",		boost::program_options::value(&zones),								"set number of zones to be fetched");
+			("debug,d",		boost::program_options::bool_switch(&debug)->implicit_value(true),	"show fetched information from proxy");
 
 		boost::program_options::variables_map varmap;
 		boost::program_options::store(boost::program_options::command_line_parser(argv).options(main_options).positional(positional_options).run(), varmap);
 		boost::program_options::notify(varmap);
 
-		//if(proxy)
-			//_run_proxy(debug);
-		//else
+		if(proxy)
+			_run_proxy(debug);
+		else
 			_update();
 	}
 	catch(const boost::program_options::required_option &e)
@@ -281,8 +279,7 @@ const TadoIf::Data& TadoIf::fetch(const std::string &args)
 }
 
 
-#if 0
-TadoIf::ProxyThread::ProxyThread(TadoIf &tadoif_in, bool debug_in, const std::string &hostname_in) : tado_if(tadoif_in), debug(debug_in), hostname(hostname_in)
+TadoIf::ProxyThread::ProxyThread(TadoIf &tadoif_in, bool debug_in) : tadoif(tadoif_in), debug(debug_in)
 {
 }
 
@@ -294,7 +291,11 @@ void TadoIf::ProxyThread::operator()()
 	std::string error;
 	std::string reply;
 	std::string time_string;
-	std::string service = (boost::format("%s.%s") % dbus_service_id % hostname).str();
+	std::string service = (boost::format("%s") % dbus_service_id).str();
+	uint32_t zone_nr;
+	time_t timestamp;
+	const struct tm *tm;
+	char timestring[64];
 
 	try
 	{
@@ -327,14 +328,14 @@ void TadoIf::ProxyThread::operator()()
 										"			<arg name=\"info\" type=\"s\" direction=\"out\"/>\n" +
 										"		</method>\n" +
 										"		<method name=\"get_data\">\n" +
+										"			<arg name=\"zone\" type=\"u\" direction=\"in\"/>\n" +
 										"			<arg name=\"time\" type=\"t\" direction=\"out\"/>\n" +
-										"			<arg name=\"type\" type=\"s\" direction=\"out\"/>\n" +
-										"			<arg name=\"host_name\" type=\"s\" direction=\"out\"/>\n" +
-										"			<arg name=\"host_alias\" type=\"s\" direction=\"out\"/>\n" +
+										"			<arg name=\"name\" type=\"s\" direction=\"out\"/>\n" +
+										"			<arg name=\"id\" type=\"u\" direction=\"out\"/>\n" +
+										"			<arg name=\"active\" type=\"u\" direction=\"out\"/>\n" +
 										"			<arg name=\"power\" type=\"d\" direction=\"out\"/>\n" +
-										"			<arg name=\"voltage\" type=\"d\" direction=\"out\"/>\n" +
-										"			<arg name=\"current\" type=\"d\" direction=\"out\"/>\n" +
 										"			<arg name=\"temperature\" type=\"d\" direction=\"out\"/>\n" +
+										"			<arg name=\"humidity\" type=\"d\" direction=\"out\"/>\n" +
 										"		</method>\n" +
 										"	</interface>\n" +
 										"</node>\n";
@@ -352,26 +353,29 @@ void TadoIf::ProxyThread::operator()()
 						{
 							if(message_method == "dump")
 							{
-								char timestring[64];
-								const struct tm *tm;
-								time_t timestamp;
+								zone_nr = 0;
 
-								timestamp = tadoif.data.time;
-								tm = localtime(&timestamp);
-								strftime(timestring, sizeof(timestring), "%Y-%m-%d %H:%M:%S", tm);
+								reply = (boost::format("%-5s %-2s %-20s %-8s %-5s %-11s %-8s %s\n") %
+										"zone#" % "id" % "name" % "status" % "power" % "temperature" % "humidity" % "time").str();
 
-								reply = (boost::format("%-16s %-13s %-19s %5s %8s %7s %11s %-4s\n") %
-										"host" % "type" % "alias" % "power" % "voltage" % "current" % "temperature" % "time").str();
+								for(const auto &zone : tadoif.data.zones)
+								{
+									timestamp = zone.time;
+									tm = localtime(&timestamp);
+									strftime(timestring, sizeof(timestring), "%Y-%m-%d %H:%M:%S", tm);
 
-								reply += (boost::format("%-16s %-13s %-19s %5.1f %8.1f %7.1f %11.1f %s\n") %
-										tadoif.data.host_name %
-										tadoif.data.type %
-										tadoif.data.host_alias %
-										tadoif.data.power %
-										tadoif.data.voltage %
-										tadoif.data.current %
-										tadoif.data.temperature %
-										timestring).str();
+									reply += (boost::format("%5u %2d %-20s %-8s %5.0f %11.1f %8.0f %s\n") %
+											zone_nr %
+											zone.id %
+											zone.name %
+											(zone.active ? "active" : "inactive") %
+											(zone.power * 100) %
+											zone.temperature %
+											zone.humidity %
+											timestring).str();
+
+									zone_nr++;
+								}
 
 								dbus_tiny_server.send_string(reply);
 							}
@@ -379,9 +383,28 @@ void TadoIf::ProxyThread::operator()()
 							{
 								if(message_method == "get_data")
 								{
-									dbus_tiny_server.send_uint64_x3string_x4double(tadoif.data.time,
-											tadoif.data.type, tadoif.data.host_name, tadoif.data.host_alias,
-											tadoif.data.power, tadoif.data.voltage, tadoif.data.current, tadoif.data.temperature);
+									try
+									{
+										dbus_tiny_server.receive_uint32(zone_nr);
+									}
+									catch(const DbusTinyException &e)
+									{
+										throw(InternalException(dbus_tiny_server.inform_error(std::string("invalid arguments to method"))));
+									}
+
+									if(zone_nr >= tadoif.data.zones.size())
+										throw(InternalException(dbus_tiny_server.inform_error(std::string("unknown zone requested"))));
+
+									TadoIf::Zone &zone = tadoif.data.zones[zone_nr];
+
+									dbus_tiny_server.send_uint64_string_x2uint32_x3double(
+											zone.time,
+											zone.name,
+											zone.id,
+											zone.active,
+											zone.power,
+											zone.temperature,
+											zone.humidity);
 								}
 								else
 									throw(InternalException(dbus_tiny_server.inform_error(std::string("unknown method called"))));
@@ -425,9 +448,9 @@ void TadoIf::ProxyThread::operator()()
 	}
 }
 
-void TadoIf::_run_proxy(const std::string &host, bool legacy, bool debug)
+void TadoIf::_run_proxy(bool debug)
 {
-	proxy_thread_class = new ProxyThread(*this, debug, host);
+	proxy_thread_class = new ProxyThread(*this, debug);
 	boost::thread proxy_thread(*proxy_thread_class);
 	proxy_thread.detach();
 
@@ -442,25 +465,30 @@ void TadoIf::_run_proxy(const std::string &host, bool legacy, bool debug)
 				char timestring[64];
 				const struct tm *tm;
 				time_t timestamp;
+				unsigned int zone_nr;
 
-				timestamp = data.time;
-				tm = localtime(&timestamp);
-				strftime(timestring, sizeof(timestring), "%Y-%m-%d %H:%M:%S", tm);
+				std::cout << boost::format("%-5s %-2s %-20s %-8s %-5s %-11s %-8s %s\n") %
+						"zone#" % "id" % "name" % "status" % "power" % "temperature" % "humidity" % "time";
+
+				zone_nr = 0;
 
 				for(const auto &zone : data.zones)
 				{
+					timestamp = zone.time;
+					tm = localtime(&timestamp);
+					strftime(timestring, sizeof(timestring), "%Y-%m-%d %H:%M:%S", tm);
 
-					std::cout << boost::format("%s %s %s %s %s %s %s %s\n") %
-							"zone #", "id", "name", "active", "power", "temperature", "humidity", "time";
-					std::cout << boost::format("%d %s %s %s %f %f %f\n") %
-							zone_nr,
-							zone.id,
-							zone.name,
-							zone.active ? "active" : "inactive",
-							zone.power * 100,
-							zone.temperature,
-							zone.humidity,
+					std::cout << boost::format("%5u %2d %-20s %-8s %5.0f %11.1f %8.0f %s\n") %
+							zone_nr %
+							zone.id %
+							zone.name %
+							(zone.active ? "active" : "inactive") %
+							(zone.power * 100) %
+							zone.temperature %
+							zone.humidity %
 							timestring;
+
+					zone_nr++;
 				}
 			}
 
@@ -473,4 +501,3 @@ void TadoIf::_run_proxy(const std::string &host, bool legacy, bool debug)
 		}
 	}
 }
-#endif
