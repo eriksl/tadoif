@@ -84,9 +84,6 @@ void TadoIf::_update()
 		access_token = object["access_token"].as_string();
 		refresh_token = object["refresh_token"].as_string();
 
-		//std::cerr << "access token: " << access_token << std::endl;
-		//std::cerr << "refresh token: " << refresh_token << std::endl;
-
 		refresh_token_out_fd.open(refresh_token_file);
 
 		if(!refresh_token_out_fd)
@@ -107,8 +104,6 @@ void TadoIf::_update()
 		ss << handle;
 		http_data = ss.str();
 
-		//std::cerr << "output: " << http_data << std::endl;
-
 		json.write(http_data);
 		object = json.release().as_object();
 
@@ -120,16 +115,12 @@ void TadoIf::_update()
 
 		data.id = object["homeId"].as_int64();
 
-		// std::cerr << "id: " << data.id << std::endl;
-
 		handle.setOpt(curlpp::options::Url((boost::format("%s/%u/%s") % homes_url % data.id % "zones").str()));
 
 		ss.clear();
 		ss.str("");
 		ss << handle;
 		http_data = ss.str();
-
-		// std::cerr << "output: " << http_data << std::endl;
 
 		json.write(http_data);
 		array = json.release().as_array();
@@ -141,8 +132,6 @@ void TadoIf::_update()
 		for(current = 0; current < zones; current++)
 		{
 			object = array[current].as_object();
-			//std::cerr << std::endl;
-			//std::cerr << object << std::endl;
 
 			data.zones[current].id = object["id"].as_int64();
 			data.zones[current].name = object["name"].as_string();
@@ -156,8 +145,6 @@ void TadoIf::_update()
 			ss.str("");
 			ss << handle;
 			http_data = ss.str();
-
-			std::cerr << "output: " << http_data << std::endl;
 
 			json.write(http_data);
 			object = json.release().as_object();
@@ -179,7 +166,6 @@ void TadoIf::_update()
 			else
 				offset = 0;
 
-			std::cerr << iso_time << std::endl;
 			boost::posix_time::ptime ptime(boost::posix_time::from_iso_extended_string(iso_time));
 			tm = boost::posix_time::to_tm(ptime);
 			data.zones[current].time = mktime(&tm) + offset;
