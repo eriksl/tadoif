@@ -18,15 +18,16 @@ int main(int argc, const char **argv)
 		data = tado_if.fetch(argc, argv);
 		zone_nr = 0;
 
+		std::cout << boost::format("%-5s %-2s %-20s %-8s %-5s %-11s %-8s %s\n") %
+				"zone#" % "id" % "name" % "status" % "power" % "temperature" % "humidity" % "time";
+
 		for(const auto &zone : data.zones)
 		{
 			timestamp = zone.time;
 			tm = localtime(&timestamp);
 			strftime(timestring, sizeof(timestring), "%Y-%m-%d %H:%M:%S", tm);
 
-			std::cout << boost::format("%s %s %s %s %s %s %s %s\n") %
-					"zone #" % "id" % "name" % "active" % "power" % "temperature" % "humidity" % "time";
-			std::cout << boost::format("%d %s %s %s %f %f %f %s\n") %
+			std::cout << boost::format("%5u %2d %-20s %-8s %5.0f %11.1f %8.0f %s\n") %
 					zone_nr %
 					zone.id %
 					zone.name %
