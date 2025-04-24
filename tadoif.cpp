@@ -49,7 +49,8 @@ void TadoIf::_update()
 		unsigned int current;
 		unsigned int zones;
 		struct tm tm;
-		unsigned int offset;
+		int offset;
+		time_t now;
 
 		refresh_token_in_fd.open(refresh_token_file);
 
@@ -158,13 +159,12 @@ void TadoIf::_update()
 			data.zones[current].humidity = object["sensorDataPoints"].as_object()["humidity"].as_object()["percentage"].as_double();
 			iso_time = object["sensorDataPoints"].as_object()["insideTemperature"].as_object()["timestamp"].as_string();
 
+			now = time((time_t *)0);
+			localtime_r(&now, &tm);
+			offset = tm.tm_gmtoff;
+
 			if(iso_time.back() == 'Z')
-			{
-				offset = 3600;
 				iso_time.pop_back();
-			}
-			else
-				offset = 0;
 
 			boost::posix_time::ptime ptime(boost::posix_time::from_iso_extended_string(iso_time));
 			tm = boost::posix_time::to_tm(ptime);
