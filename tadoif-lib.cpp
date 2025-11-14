@@ -38,7 +38,7 @@ void TadoIf::_update(bool debug)
 		std::string refresh_token;
 		std::string access_token;
 		curlpp::Cleanup myCleanup;
-		curlpp::Easy handle;
+		curlpp::Easy curl_handle;
 		std::list<std::string> curl_headers;
 		std::stringstream ss;
 		std::string http_data;
@@ -60,14 +60,14 @@ void TadoIf::_update(bool debug)
 		refresh_token_in_fd >> refresh_token;
 		refresh_token_in_fd.close();
 
-		handle.setOpt(curlpp::options::Url(refresh_token_url));
-		handle.setOpt(curlpp::options::Timeout(10));
-		handle.setOpt(curlpp::options::Post(true));
-		handle.setOpt(curlpp::options::PostFields((boost::format("client_id=1bb50063-6b0c-4d11-bd99-387f4a91cc46&grant_type=refresh_token&refresh_token=%s") % refresh_token).str()));
+		curl_handle.setOpt(curlpp::options::Url(refresh_token_url));
+		curl_handle.setOpt(curlpp::options::Timeout(10));
+		curl_handle.setOpt(curlpp::options::Post(true));
+		curl_handle.setOpt(curlpp::options::PostFields((boost::format("client_id=1bb50063-6b0c-4d11-bd99-387f4a91cc46&grant_type=refresh_token&refresh_token=%s") % refresh_token).str()));
 
 		ss.clear();
 		ss.str("");
-		ss << handle;
+		ss << curl_handle;
 		http_data = ss.str();
 
 		json.write(http_data);
@@ -101,13 +101,13 @@ void TadoIf::_update(bool debug)
 		curl_headers.clear();
 		curl_headers.insert(curl_headers.begin(), (boost::format("Authorization: Bearer %s") % access_token).str());
 
-		handle.setOpt(curlpp::options::Url(home_url));
-		handle.setOpt(curlpp::options::Post(false));
-		handle.setOpt(curlpp::options::HttpHeader(curl_headers));
+		curl_handle.setOpt(curlpp::options::Url(home_url));
+		curl_handle.setOpt(curlpp::options::Post(false));
+		curl_handle.setOpt(curlpp::options::HttpHeader(curl_headers));
 
 		ss.clear();
 		ss.str("");
-		ss << handle;
+		ss << curl_handle;
 		http_data = ss.str();
 
 		json.write(http_data);
@@ -121,11 +121,11 @@ void TadoIf::_update(bool debug)
 
 		data.id = object["homeId"].as_int64();
 
-		handle.setOpt(curlpp::options::Url((boost::format("%s/%u/%s") % homes_url % data.id % "zones").str()));
+		curl_handle.setOpt(curlpp::options::Url((boost::format("%s/%u/%s") % homes_url % data.id % "zones").str()));
 
 		ss.clear();
 		ss.str("");
-		ss << handle;
+		ss << curl_handle;
 		http_data = ss.str();
 
 		json.write(http_data);
@@ -145,11 +145,11 @@ void TadoIf::_update(bool debug)
 
 		for(current = 0; current < zones; current++)
 		{
-			handle.setOpt(curlpp::options::Url((boost::format("%s/%u/%s/%u/state") % homes_url % data.id % "zones" % data.zones[current].id).str()));
+			curl_handle.setOpt(curlpp::options::Url((boost::format("%s/%u/%s/%u/state") % homes_url % data.id % "zones" % data.zones[current].id).str()));
 
 			ss.clear();
 			ss.str("");
-			ss << handle;
+			ss << curl_handle;
 			http_data = ss.str();
 
 			json.write(http_data);
