@@ -90,7 +90,7 @@ class TadoIf
 		void _update(bool debug);
 		void _fetch(const std::vector<std::string> &);
 
-		__attribute__((noreturn)) void _run_proxy(bool debug);
+		__attribute__((noreturn)) void _run_proxy(unsigned int period_seconds, bool debug);
 
 		Data data;
 		ProxyThread *proxy_thread_class;

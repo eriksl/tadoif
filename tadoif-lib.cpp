@@ -207,9 +207,13 @@ void TadoIf::_fetch(const std::vector<std::string> &argv)
 	{
 		bool proxy;
 		bool debug;
+		unsigned int period_seconds;
+
+		period_seconds = 0;
 
 		positional_options.add("host", -1);
 		main_options.add_options()
+			("period,P",	boost::program_options::value<unsigned int>(&period_seconds),		"period between proxy runs in seconds")
 			("proxy,p",		boost::program_options::bool_switch(&proxy)->implicit_value(true),	"run proxy")
 			("debug,d",		boost::program_options::bool_switch(&debug)->implicit_value(true),	"show fetched information from proxy");
 
@@ -218,7 +222,7 @@ void TadoIf::_fetch(const std::vector<std::string> &argv)
 		boost::program_options::notify(varmap);
 
 		if(proxy)
-			_run_proxy(debug);
+			_run_proxy(period_seconds, debug);
 		else
 			_update(debug);
 	}
@@ -452,11 +456,14 @@ void TadoIf::ProxyThread::operator()()
 	}
 }
 
-void TadoIf::_run_proxy(bool debug)
+void TadoIf::_run_proxy(unsigned int period_seconds, bool debug)
 {
 	proxy_thread_class = new ProxyThread(*this, debug);
 	boost::thread proxy_thread(*proxy_thread_class);
 	proxy_thread.detach();
+
+	if(period_seconds < 60)
+		throw(InternalException((boost::format("invalid run delay: %s seconds (must be >= 60)") % period_seconds).str()));
 
 	for(;;)
 	{
@@ -496,7 +503,7 @@ void TadoIf::_run_proxy(bool debug)
 				}
 			}
 
-			boost::this_thread::sleep_for(boost::chrono::duration<unsigned int>(30));
+			boost::this_thread::sleep_for(boost::chrono::duration<unsigned int>(period_seconds));
 		}
 		catch(const InternalException &e)
 		{
