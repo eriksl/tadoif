@@ -8,7 +8,7 @@
 -Wpacked -Winit-self -Wmissing-include-dirs
 -Wmissing-noreturn -Wbool-compare
 -Wsuggest-attribute=noreturn -Wsuggest-attribute=format -Wmissing-format-attribute
--Wuninitialized -Wtrampolines -Wframe-larger-than=2048
+-Wuninitialized -Wtrampolines -Wframe-larger-than=65536
 -Wunsafe-loop-optimizations -Wshadow -Wpointer-arith
 -Wcast-qual -Wwrite-strings -Wsequence-point -Wlogical-op -Wlogical-not-parentheses
 -Wdisabled-optimization
@@ -19,3 +19,4 @@
 -Wno-error=unsafe-loop-optimizations
 -Wno-packed
 -Wno-unused-parameter
+-Wno-error=ignored-qualifiers

@@ -14,22 +14,27 @@ endif
 CPP				:=	g++
 
 CWD					!=	/bin/pwd
-DBUS_CFLAGS			!=  pkg-config --cflags dbus-1
+DBUS_CPPFLAGS		!=  pkg-config --cflags dbus-1
 DBUS_LIBS			!=  pkg-config --libs dbus-1
-DBUS_TINY_CFLAGS	:=	-I$(PWD)/DBUS-Tiny
+DBUS_TINY_CPPFLAGS	:=	-I$(PWD)/DBUS-Tiny
 DBUS_TINY_LIBS		:=	-L$(PWD)/DBUS-Tiny -Wl,-rpath=$(CWD)/DBUS-Tiny -ldbus-tiny
-CURLPP_CFLAGS		!= 	pkg-config --cflags curlpp
+#CURLPP_CPPFLAGS	!= 	pkg-config --cflags curlpp
+CURLPP_CPPFLAGS		:= 	-isystem /usr/include/curlpp -DWITH_GZFILEOP
 CURLPP_LIBS			!= 	pkg-config --libs curlpp
+BOOST_LIBS			:=	-lboost_system -lboost_program_options -lboost_regex -lboost_thread -lboost_chrono -lboost_json
 
-CPPFLAGS		:= -O3 -fPIC -Wall -Wextra -Werror -Wframe-larger-than=65536 -Wno-error=ignored-qualifiers $(MAGICK_CFLAGS) $(DBUS_TINY_CFLAGS) $(DBUS_CFLAGS) \
-					-lssl -lcrypto -lpthread -lboost_system -lboost_program_options -lboost_regex -lboost_thread -lboost_chrono -lboost_json \
-							$(MAGICK_LIBS) $(DBUS_TINY_LIBS) $(DBUS_LIBS) $(CURLPP_LIBS) \
+CPPFLAGS		:= -O3 $(DBUS_TINY_CPPFLAGS) $(DBUS_CPPFLAGS) $(CURLPP_CPPFLAGS)
 
-LIBOBJS			:= tadoif.o exception.o
-LIB				:= libtadoif.so
-EXEC			:= tadoif-server
-EXECOBJS		:= $(EXEC).o
+LDFLAGS			:= -O3 -L. -ltadoif -Wl,-rpath=$(CWD) \
+						$(BOOST_LIBS) $(DBUS_TINY_LIBS) $(DBUS_LIBS) $(CURLPP_LIBS) \
+						-lssl -lcrypto -lpthread
+
 HDRS			:= tadoif.h
+LIBOBJS			:= tadoif-lib.o exception.o
+LIB				:= libtadoif.so
+EXECSRCS		:= tadoif.cpp
+EXECOBJS		:= tadoif.o
+EXEC			:= tadoif
 
 .PRECIOUS:		*.h *.cpp *.i
 .PHONY:			all
@@ -44,14 +49,21 @@ exception.o:	$(HDRS)
 $(LIBOBJS):		$(HDRS)
 $(EXECOBJS):	$(HDRS)
 
+# -fpermissive for curl headers:
+#  /usr/include/curlpp/Options.hpp:281:74: error: invalid conversion from ‘int’ to ‘CURLoption’ [-fpermissive]
+# typedef curlpp::OptionTrait<curl_closepolicy, CURLOPT_CLOSEPOLICY> ClosePolicy;
 %.o:			%.cpp
-				$(VECHO) "CPP $< -> $@"
-				$(Q) $(CPP) @gcc-warnings $(CPPFLAGS) -c $< -o $@
+				$(VECHO) "CPP[LIB] $< -> $@"
+				$(Q) $(CPP) @gcc-warnings $(CPPFLAGS) -fpermissive -fPIC -c $< -o $@
 
 $(LIB):			$(LIBOBJS)
-				$(VECHO) "LD $(LIBOBJS) -> $@"
-				$(Q) $(CPP) @gcc-warnings $(CPPFLAGS) $(LIBOBJS) -shared -o $@
+				$(VECHO) "LD[LIB] $(LIBOBJS) -> $@"
+				$(Q) $(CPP) @gcc-warnings $(LDFLAGS) $(LIBOBJS) -fPIC -shared -o $@
+
+$(EXECOBJS):	$(EXECSRCS)
+				$(VECHO) "CPP $< -> $@"
+				$(Q) $(CPP) @gcc-warnings $(CPPFLAGS) -fpermissive -c $< -o $@
 
 $(EXEC):		$(EXECOBJS) $(LIB)
 				$(VECHO) "LD $(EXECOBJS) -> $@"
-				$(Q) $(CPP) @gcc-warnings $(CPPFLAGS) $(EXECOBJS) -L. -ltadoif -Wl,-rpath=$(CWD) -o $@
+				$(Q) $(CPP) @gcc-warnings $(LDFLAGS) $(EXECOBJS) -o $@

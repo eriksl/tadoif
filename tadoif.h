@@ -87,7 +87,7 @@ class TadoIf
 				bool debug;
 		};
 
-		void _update();
+		void _update(bool debug);
 		void _fetch(const std::vector<std::string> &);
 
 		__attribute__((noreturn)) void _run_proxy(bool debug);
