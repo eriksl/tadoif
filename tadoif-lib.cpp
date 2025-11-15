@@ -323,7 +323,7 @@ void TadoIf::ProxyThread::operator()()
 					{
 						if(message_method == "Introspect")
 						{
-							reply += std::string("") +
+							reply = std::string("") +
 										"<!DOCTYPE node PUBLIC \"-//freedesktop//DTD D-BUS Object Introspection 1.0//EN\" \"http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd\">\n" +
 										"<node>\n" +
 										"	<interface name=\"org.freedesktop.DBus.Introspectable\">\n" +
