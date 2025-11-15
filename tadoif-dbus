@@ -1,3 +1,18 @@
 #!/bin/sh
 
-busctl call "name.slagter.erik.tadoif" "/name/slagter/erik/tadoif" "name.slagter.erik.tadoif" dump |& sed -e 's/^s "//' -e 's/\\n"$//' -e 's/\\n/\n/g'
+service="name.slagter.erik.tadoif"
+object="/$(echo $service | tr . /)"
+
+function dbus_call()
+{
+	busctl call $service $object "$@" | sed -e 's/^s "//' -e 's/\\n"$//' -e 's/\\n/\n/g' -e 's/\\t/\t/g' | expand -4
+}
+
+echo "INTROSPECT"
+dbus_call "org.freedesktop.DBus.Introspectable" Introspect
+echo "DUMP"
+dbus_call $service dump
+echo "GET_DATA"
+for zone in 0 1 2; do
+	dbus_call $service get_data u $zone
+done
